@@ -202,6 +202,15 @@ typedef enum msg_parse_result {
     ACTION( REQ_REDIS_SELECT)                  /* only during init */                               \
     ACTION( REQ_REDIS_COMMAND)                 /* Sent to random server for redis-cli completions*/ \
     ACTION( REQ_REDIS_LOLWUT)                  /* Vitally important */                              \
+    ACTION( REQ_REDIS_BF_INFO)                 /* Bloom Filter */                                   \
+    ACTION( REQ_REDIS_BF_SCANDUMP)                                                                  \
+    ACTION( REQ_REDIS_BF_EXISTS)                                                                    \
+    ACTION( REQ_REDIS_BF_ADD)                                                                       \
+    ACTION( REQ_REDIS_BF_LOADCHUNK)                                                                 \
+    ACTION( REQ_REDIS_BF_RESERVE)                                                                   \
+    ACTION( REQ_REDIS_BF_MADD)                                                                      \
+    ACTION( REQ_REDIS_BF_INSERT)                                                                    \
+    ACTION( REQ_REDIS_BF_MEXISTS)                                                                   \
     ACTION( RSP_REDIS_STATUS )                 /* redis response */                                 \
     ACTION( RSP_REDIS_ERROR )                                                                       \
     ACTION( RSP_REDIS_ERROR_ERR )                                                                   \

@@ -89,6 +89,8 @@ redis_arg0(const struct msg *r)
     case MSG_REQ_REDIS_ZCARD:
         /* TODO: Support emulating 2-arg username+password auth by just checking password? */
     case MSG_REQ_REDIS_AUTH:
+
+    case MSG_REQ_REDIS_BF_INFO:
         return true;
 
     default:
@@ -132,6 +134,10 @@ redis_arg1(const struct msg *r)
     case MSG_REQ_REDIS_ZRANK:
     case MSG_REQ_REDIS_ZREVRANK:
     case MSG_REQ_REDIS_ZSCORE:
+
+    case MSG_REQ_REDIS_BF_SCANDUMP:
+    case MSG_REQ_REDIS_BF_EXISTS:
+    case MSG_REQ_REDIS_BF_ADD:
         return true;
 
     default:
@@ -172,6 +178,8 @@ redis_arg2(const struct msg *r)
     case MSG_REQ_REDIS_ZREMRANGEBYLEX:
     case MSG_REQ_REDIS_ZREMRANGEBYRANK:
     case MSG_REQ_REDIS_ZREMRANGEBYSCORE:
+
+    case MSG_REQ_REDIS_BF_LOADCHUNK:
         return true;
 
     default:
@@ -283,6 +291,11 @@ redis_argn(const struct msg *r)
     case MSG_REQ_REDIS_GEOSEARCHSTORE:
 
     case MSG_REQ_REDIS_RESTORE:
+
+    case MSG_REQ_REDIS_BF_RESERVE:
+    case MSG_REQ_REDIS_BF_MADD:
+    case MSG_REQ_REDIS_BF_INSERT:
+    case MSG_REQ_REDIS_BF_MEXISTS:
         return true;
 
     default:
@@ -1008,7 +1021,10 @@ redis_parse_req(struct msg *r)
                     }
                     break;
                 }
-
+                if (str6icmp(m, 'b', 'f', '.', 'a', 'd', 'd')) {
+                    r->type = MSG_REQ_REDIS_BF_ADD;
+                    break;
+                }
                 break;
 
             case 7:
@@ -1105,6 +1121,16 @@ redis_parse_req(struct msg *r)
                     break;
                 }
 
+                if (str7icmp(m, 'b', 'f', '.', 'm', 'a', 'd', 'd')) {
+                    r->type = MSG_REQ_REDIS_BF_MADD;
+                    break;
+                }
+
+                if (str7icmp(m, 'b', 'f', '.', 'i', 'n', 'f', 'o')) {
+                    r->type = MSG_REQ_REDIS_BF_INFO;
+                    break;
+                }
+
                 break;
 
             case 8:
@@ -1181,6 +1207,15 @@ redis_parse_req(struct msg *r)
                     break;
                 }
 
+                if (str9icmp(m, 'b', 'f', '.', 'i', 'n', 's', 'e', 'r', 't')) {
+                    r->type = MSG_REQ_REDIS_BF_INSERT;
+                    break;
+                }
+
+                if (str9icmp(m, 'b', 'f', '.', 'e', 'x', 'i', 's', 't', 's')) {
+                    r->type = MSG_REQ_REDIS_BF_EXISTS;
+                    break;
+                }
                 break;
 
             case 10:
@@ -1204,6 +1239,14 @@ redis_parse_req(struct msg *r)
                     break;
                 }
 
+                if (str10icmp(m, 'b', 'f', '.', 'r', 'e', 's', 'e', 'r', 'v', 'e')) {
+                    r->type = MSG_REQ_REDIS_BF_RESERVE;
+                    break;
+                }
+                if (str10icmp(m, 'b', 'f', '.', 'm', 'e', 'x', 'i', 's', 't', 's')) {
+                    r->type = MSG_REQ_REDIS_BF_MEXISTS;
+                    break;
+                }
 
                 break;
 
@@ -1253,6 +1296,11 @@ redis_parse_req(struct msg *r)
                     break;
                 }
 
+                if (str11icmp(m, 'b', 'f', '.', 's', 'c', 'a', 'n', 'd', 'u', 'm', 'p')) {
+                    r->type = MSG_REQ_REDIS_BF_SCANDUMP;
+                    break;
+                }
+
                 break;
 
             case 12:
@@ -1261,6 +1309,10 @@ redis_parse_req(struct msg *r)
                     break;
                 }
 
+                if (str12icmp(m, 'b', 'f', '.', 'l', 'o', 'a', 'd', 'c', 'h', 'u', 'n', 'k')) {
+                    r->type = MSG_REQ_REDIS_BF_LOADCHUNK;
+                    break;
+                }
 
                 break;
 
@@ -1633,14 +1685,14 @@ redis_parse_req(struct msg *r)
 
             m = p + r->rlen;
             if (m >= b->last) {
-                /* 
+                /*
                  * For EVAL/EVALHASH, the r->token has been assigned a value.  When
-                 * m >= b->last happens will need to repair mbuf.  
-                 * 
+                 * m >= b->last happens will need to repair mbuf.
+                 *
                  * At the end of redis_parse_req, r->token will be used to choose
                  * the start (p) for the next call to redis_parse_req and clear
                  * r->token when repairing this and adding more data.
-                 * 
+                 *
                  * So, only when r->token == NULL we need to calculate r->rlen again.
                  */
                 if (r->token == NULL) {

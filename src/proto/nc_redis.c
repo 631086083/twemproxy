@@ -28,6 +28,7 @@
     ACTION( invalid_password, "-ERR invalid password\r\n"                         ) \
     ACTION( auth_required,    "-NOAUTH Authentication required\r\n"               ) \
     ACTION( no_password,      "-ERR Client sent AUTH, but no password is set\r\n" ) \
+    ACTION( wrong_argc,       "-ERR wrong number of arguments\r\n"                ) \
 
 #define DEFINE_ACTION(_var, _str) static struct string rsp_##_var = string(_str);
     RSP_STRING( DEFINE_ACTION )
@@ -1345,7 +1346,7 @@ redis_parse_req(struct msg *r)
                     }
                     state = SW_ARGN_LEN;
                 } else if (r->narg == 1) {
-                    goto error;
+                    goto wargc;
                 } else if (redis_argeval(r)) {
                     state = SW_ARG1_LEN;
                 } else {
@@ -1920,6 +1921,18 @@ enomem:
 
     log_hexdump(LOG_INFO, b->pos, mbuf_length(b), "out of memory on parse req %"PRIu64" "
                 "res %d type %d state %d", r->id, r->result, r->type, r->state);
+
+    return;
+
+wargc:
+    r->pos = p + 1;
+    r->state = SW_START;
+    r->token = NULL;
+    r->result = MSG_PARSE_OK;
+
+    r->noforward = 1;
+    log_hexdump(LOG_INFO, b->pos, mbuf_length(b), "wrong number args of command on parse req %"PRIu64" "
+            "res %d type %d state %d", r->id, r->result, r->type, r->state);
 
     return;
 
@@ -2990,8 +3003,9 @@ redis_reply(struct msg *r)
         return msg_append(response, rsp_pong.data, rsp_pong.len);
 
     default:
-        NOT_REACHED();
-        return NC_ERROR;
+        return msg_append(response, rsp_wrong_argc.data, rsp_wrong_argc.len);
+//        NOT_REACHED();
+//        return NC_ERROR;
     }
 }
 

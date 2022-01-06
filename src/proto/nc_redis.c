@@ -28,14 +28,14 @@
     ACTION( invalid_password, "-ERR invalid password\r\n"                         ) \
     ACTION( auth_required,    "-NOAUTH Authentication required\r\n"               ) \
     ACTION( no_password,      "-ERR Client sent AUTH, but no password is set\r\n" ) \
-    ACTION( wrong_argc,       "-ERR wrong number of arguments\r\n"                ) \
+    ACTION( wrong_argc,       "-ERR wrong number of arguments for "               ) \
 
 #define DEFINE_ACTION(_var, _str) static struct string rsp_##_var = string(_str);
     RSP_STRING( DEFINE_ACTION )
 #undef DEFINE_ACTION
 
 static rstatus_t redis_handle_auth_req(struct msg *request, struct msg *response);
-
+uint8_t* redis_command_name(msg_type_t type);
 /*
  * Return true, if the redis command take no key, otherwise
  * return false
@@ -3001,12 +3001,15 @@ redis_reply(struct msg *r)
     switch (r->type) {
     case MSG_REQ_REDIS_PING:
         return msg_append(response, rsp_pong.data, rsp_pong.len);
-
-    default:
-        return msg_append(response, rsp_wrong_argc.data, rsp_wrong_argc.len);
-//        NOT_REACHED();
-//        return NC_ERROR;
     }
+
+    //If an incomplete command is received without a key, an error will be returned
+    uint8_t *name = redis_command_name(r->type);
+    uint8_t *result = nc_alloc(rsp_wrong_argc.len + strlen(name) + 1);
+    strcpy(result, rsp_wrong_argc.data);
+    strcat(result, name);
+    return msg_append(response, result, strlen(result));
+
 }
 
 void
@@ -3122,6 +3125,15 @@ redis_handle_auth_req(struct msg *req, struct msg *rsp)
          * directive should be treated as an error
          */
         return msg_append(rsp, rsp_no_password.data, rsp_no_password.len);
+    }
+
+    // only auth was sent, it illagle;
+    if (req->narg == 1) {
+        uint8_t *name = redis_command_name(req->type);
+        uint8_t *result = nc_alloc(rsp_wrong_argc.len + strlen(name) + 1);
+        strcpy(result, rsp_wrong_argc.data);
+        strcat(result, name);
+        return msg_append(rsp, result, strlen(result));
     }
 
     kpos = array_get(req->keys, 0);
@@ -3254,4 +3266,287 @@ redis_swallow_msg(struct conn *conn, struct msg *pmsg, struct msg *msg)
                  conn_pool->redis_db, conn_pool->name.data,
                  conn_server->name.data, message);
     }
+}
+
+uint8_t*
+redis_command_name(msg_type_t type) {
+    switch (type) {
+        case MSG_REQ_REDIS_GET:
+            return (uint8_t *) "'get' command\r\n";
+        case MSG_REQ_REDIS_COPY:
+            return (uint8_t *) "'copy' command\r\n";
+        case MSG_REQ_REDIS_DEL:
+            return (uint8_t *) "'del' command\r\n";
+        case MSG_REQ_REDIS_EXISTS:
+            return (uint8_t *) "'exists' command\r\n";
+        case MSG_REQ_REDIS_EXPIRE:
+            return (uint8_t *) "'expire' command\r\n";
+        case MSG_REQ_REDIS_EXPIREAT:
+            return (uint8_t *) "'expireat' command\r\n";
+        case MSG_REQ_REDIS_MOVE:
+            return (uint8_t *) "'move' command\r\n";
+        case MSG_REQ_REDIS_PEXPIRE:
+            return (uint8_t *) "'pexpire' command\r\n";
+        case MSG_REQ_REDIS_PEXPIREAT:
+            return (uint8_t *) "'pexpireat' command\r\n";
+        case MSG_REQ_REDIS_PERSIST:
+            return (uint8_t *) "'persist' command\r\n";
+        case MSG_REQ_REDIS_PTTL:
+            return (uint8_t *) "'pttl' command\r\n";
+        case MSG_REQ_REDIS_SORT:
+            return (uint8_t *) "'sort' command\r\n";
+        case MSG_REQ_REDIS_TOUCH:
+            return (uint8_t *) "'touch' command\r\n";
+        case MSG_REQ_REDIS_TTL:
+            return (uint8_t *) "'ttl' command\r\n";
+        case MSG_REQ_REDIS_TYPE:
+            return (uint8_t *) "'type' command\r\n";
+        case MSG_REQ_REDIS_UNLINK:
+            return (uint8_t *) "'unlink' command\r\n";
+        case MSG_REQ_REDIS_APPEND:
+            return (uint8_t *) "'append' command\r\n";
+        case MSG_REQ_REDIS_BITCOUNT:
+            return (uint8_t *) "'bitcount' command\r\n";
+        case MSG_REQ_REDIS_BITFIELD:
+            return (uint8_t *) "'bitfield' command\r\n";
+        case MSG_REQ_REDIS_BITPOS:
+            return (uint8_t *) "'bitpos' command\r\n";
+        case MSG_REQ_REDIS_DECR:
+            return (uint8_t *) "'decr' command\r\n";
+        case MSG_REQ_REDIS_DECRBY:
+            return (uint8_t *) "'decrby' command\r\n";
+        case MSG_REQ_REDIS_DUMP:
+            return (uint8_t *) "'dump' command\r\n";
+        case MSG_REQ_REDIS_GETBIT:
+            return (uint8_t *) "'getbit' command\r\n";
+        case MSG_REQ_REDIS_GETDEL:
+            return (uint8_t *) "'getdel' command\r\n";
+        case MSG_REQ_REDIS_GETEX:
+            return (uint8_t *) "'getex' command\r\n";
+        case MSG_REQ_REDIS_GETRANGE:
+            return (uint8_t *) "'getrange' command\r\n";
+        case MSG_REQ_REDIS_GETSET:
+            return (uint8_t *) "'getset' command\r\n";
+        case MSG_REQ_REDIS_INCR:
+            return (uint8_t *) "'incr' command\r\n";
+        case MSG_REQ_REDIS_INCRBY:
+            return (uint8_t *) "'incrby' command\r\n";
+        case MSG_REQ_REDIS_INCRBYFLOAT:
+            return (uint8_t *) "'incrbyfloat' command\r\n";
+        case MSG_REQ_REDIS_MGET:
+            return (uint8_t *) "'mget' command\r\n";
+        case MSG_REQ_REDIS_MSET:
+            return (uint8_t *) "'mset' command\r\n";
+        case MSG_REQ_REDIS_PSETEX:
+            return (uint8_t *) "'psetex' command\r\n";
+        case MSG_REQ_REDIS_RESTORE:
+            return (uint8_t *) "'restore' command\r\n";
+        case MSG_REQ_REDIS_SET:
+            return (uint8_t *) "'set' command\r\n";
+        case MSG_REQ_REDIS_SETBIT:
+            return (uint8_t *) "'setbit' command\r\n";
+        case MSG_REQ_REDIS_SETEX:
+            return (uint8_t *) "'setex' command\r\n";
+        case MSG_REQ_REDIS_SETNX:
+            return (uint8_t *) "'setnx' command\r\n";
+        case MSG_REQ_REDIS_SETRANGE:
+            return (uint8_t *) "'setrange' command\r\n";
+        case MSG_REQ_REDIS_STRLEN:
+            return (uint8_t *) "'strlen' command\r\n";
+        case MSG_REQ_REDIS_HDEL:
+            return (uint8_t *) "'hdel' command\r\n";
+        case MSG_REQ_REDIS_HEXISTS:
+            return (uint8_t *) "'hexists' command\r\n";
+        case MSG_REQ_REDIS_HGET:
+            return (uint8_t *) "'hget' command\r\n";
+        case MSG_REQ_REDIS_HGETALL:
+            return (uint8_t *) "'hgetall' command\r\n";
+        case MSG_REQ_REDIS_HINCRBY:
+            return (uint8_t *) "'hincrby' command\r\n";
+        case MSG_REQ_REDIS_HINCRBYFLOAT:
+            return (uint8_t *) "'hincrbyfloat' command\r\n";
+        case MSG_REQ_REDIS_HKEYS:
+            return (uint8_t *) "'hkeys' command\r\n";
+        case MSG_REQ_REDIS_HLEN:
+            return (uint8_t *) "'hlen' command\r\n";
+        case MSG_REQ_REDIS_HMGET:
+            return (uint8_t *) "'hmget' command\r\n";
+        case MSG_REQ_REDIS_HMSET:
+            return (uint8_t *) "'hmset' command\r\n";
+        case MSG_REQ_REDIS_HRANDFIELD:
+            return (uint8_t *) "'hrandfield' command\r\n";
+        case MSG_REQ_REDIS_HSET:
+            return (uint8_t *) "'hset' command\r\n";
+        case MSG_REQ_REDIS_HSETNX:
+            return (uint8_t *) "'hsetnx' command\r\n";
+        case MSG_REQ_REDIS_HSCAN:
+            return (uint8_t *) "'hscan' command\r\n";
+        case MSG_REQ_REDIS_HSTRLEN:
+            return (uint8_t *) "'hstrlen' command\r\n";
+        case MSG_REQ_REDIS_HVALS:
+            return (uint8_t *) "'hvals' command\r\n";
+        case MSG_REQ_REDIS_LINDEX:
+            return (uint8_t *) "'lindex' command\r\n";
+        case MSG_REQ_REDIS_LINSERT:
+            return (uint8_t *) "'linsert' command\r\n";
+        case MSG_REQ_REDIS_LLEN:
+            return (uint8_t *) "'llen' command\r\n";
+        case MSG_REQ_REDIS_LMOVE:
+            return (uint8_t *) "'lmove' command\r\n";
+        case MSG_REQ_REDIS_LPOP:
+            return (uint8_t *) "'lpop' command\r\n";
+        case MSG_REQ_REDIS_LPOS:
+            return (uint8_t *) "'lpos' command\r\n";
+        case MSG_REQ_REDIS_LPUSH:
+            return (uint8_t *) "'lpush' command\r\n";
+        case MSG_REQ_REDIS_LPUSHX:
+            return (uint8_t *) "'lpushx' command\r\n";
+        case MSG_REQ_REDIS_LRANGE:
+            return (uint8_t *) "'lrange' command\r\n";
+        case MSG_REQ_REDIS_LREM:
+            return (uint8_t *) "'lrem' command\r\n";
+        case MSG_REQ_REDIS_LSET:
+            return (uint8_t *) "'lset' command\r\n";
+        case MSG_REQ_REDIS_LTRIM:
+            return (uint8_t *) "'ltrim' command\r\n";
+        case MSG_REQ_REDIS_PFADD:
+            return (uint8_t *) "'pfadd' command\r\n";
+        case MSG_REQ_REDIS_PFCOUNT:
+            return (uint8_t *) "'pfcount' command\r\n";
+        case MSG_REQ_REDIS_PFMERGE:
+            return (uint8_t *) "'pfmerge' command\r\n";
+        case MSG_REQ_REDIS_RPOP:
+            return (uint8_t *) "'rpop' command\r\n";
+        case MSG_REQ_REDIS_RPOPLPUSH:
+            return (uint8_t *) "'rpoplpush' command\r\n";
+        case MSG_REQ_REDIS_RPUSH:
+            return (uint8_t *) "'rpush' command\r\n";
+        case MSG_REQ_REDIS_RPUSHX:
+            return (uint8_t *) "'rpushx' command\r\n";
+        case MSG_REQ_REDIS_SADD:
+            return (uint8_t *) "'sadd' command\r\n";
+        case MSG_REQ_REDIS_SCARD:
+            return (uint8_t *) "'scard' command\r\n";
+        case MSG_REQ_REDIS_SDIFF:
+            return (uint8_t *) "'sdiff' command\r\n";
+        case MSG_REQ_REDIS_SDIFFSTORE:
+            return (uint8_t *) "'sdiffstore' command\r\n";
+        case MSG_REQ_REDIS_SINTER:
+            return (uint8_t *) "'sinter' command\r\n";
+        case MSG_REQ_REDIS_SINTERSTORE:
+            return (uint8_t *) "'sinterstore' command\r\n";
+        case MSG_REQ_REDIS_SISMEMBER:
+            return (uint8_t *) "'sismember' command\r\n";
+        case MSG_REQ_REDIS_SMISMEMBER:
+            return (uint8_t *) "'smismember' command\r\n";
+        case MSG_REQ_REDIS_SMEMBERS:
+            return (uint8_t *) "'smembers' command\r\n";
+        case MSG_REQ_REDIS_SMOVE:
+            return (uint8_t *) "'smove' command\r\n";
+        case MSG_REQ_REDIS_SPOP:
+            return (uint8_t *) "'spop' command\r\n";
+        case MSG_REQ_REDIS_SRANDMEMBER:
+            return (uint8_t *) "'srandmember' command\r\n";
+        case MSG_REQ_REDIS_SREM:
+            return (uint8_t *) "'srem' command\r\n";
+        case MSG_REQ_REDIS_SUNION:
+            return (uint8_t *) "'sunion' command\r\n";
+        case MSG_REQ_REDIS_SUNIONSTORE:
+            return (uint8_t *) "'sunionstore' command\r\n";
+        case MSG_REQ_REDIS_SSCAN:
+            return (uint8_t *) "'sscan' command\r\n";
+        case MSG_REQ_REDIS_ZADD:
+            return (uint8_t *) "'zadd' command\r\n";
+        case MSG_REQ_REDIS_ZCARD:
+            return (uint8_t *) "'zcard' command\r\n";
+        case MSG_REQ_REDIS_ZCOUNT:
+            return (uint8_t *) "'zcount' command\r\n";
+        case MSG_REQ_REDIS_ZDIFF:
+            return (uint8_t *) "'zdiff' command\r\n";
+        case MSG_REQ_REDIS_ZDIFFSTORE:
+            return (uint8_t *) "'zdiffstore' command\r\n";
+        case MSG_REQ_REDIS_ZINCRBY:
+            return (uint8_t *) "'zincrby' command\r\n";
+        case MSG_REQ_REDIS_ZINTER:
+            return (uint8_t *) "'zinter' command\r\n";
+        case MSG_REQ_REDIS_ZINTERSTORE:
+            return (uint8_t *) "'zinterstore' command\r\n";
+        case MSG_REQ_REDIS_ZLEXCOUNT:
+            return (uint8_t *) "'zlexcount' command\r\n";
+        case MSG_REQ_REDIS_ZMSCORE:
+            return (uint8_t *) "'zmscore' command\r\n";
+        case MSG_REQ_REDIS_ZPOPMIN:
+            return (uint8_t *) "'zpopmin' command\r\n";
+        case MSG_REQ_REDIS_ZPOPMAX:
+            return (uint8_t *) "'zpopmax' command\r\n";
+        case MSG_REQ_REDIS_ZRANDMEMBER:
+            return (uint8_t *) "'zrandmember' command\r\n";
+        case MSG_REQ_REDIS_ZRANGE:
+            return (uint8_t *) "'zrange' command\r\n";
+        case MSG_REQ_REDIS_ZRANGEBYLEX:
+            return (uint8_t *) "'zrangebylex' command\r\n";
+        case MSG_REQ_REDIS_ZRANGEBYSCORE:
+            return (uint8_t *) "'zrangebyscore' command\r\n";
+        case MSG_REQ_REDIS_ZRANGESTORE:
+            return (uint8_t *) "'zrangestore' command\r\n";
+        case MSG_REQ_REDIS_ZRANK:
+            return (uint8_t *) "'zrank' command\r\n";
+        case MSG_REQ_REDIS_ZREM:
+            return (uint8_t *) "'zrem' command\r\n";
+        case MSG_REQ_REDIS_ZREMRANGEBYRANK:
+            return (uint8_t *) "'zremrangebyrank' command\r\n";
+        case MSG_REQ_REDIS_ZREMRANGEBYLEX:
+            return (uint8_t *) "'zremrangebylex' command\r\n";
+        case MSG_REQ_REDIS_ZREMRANGEBYSCORE:
+            return (uint8_t *) "'zremrangebyscore' command\r\n";
+        case MSG_REQ_REDIS_ZREVRANGE:
+            return (uint8_t *) "'zrevrange' command\r\n";
+        case MSG_REQ_REDIS_ZREVRANGEBYLEX:
+            return (uint8_t *) "'zrevrangebylex' command\r\n";
+        case MSG_REQ_REDIS_ZREVRANGEBYSCORE:
+            return (uint8_t *) "'zrevrangebyscore' command\r\n";
+        case MSG_REQ_REDIS_ZREVRANK:
+            return (uint8_t *) "'zrevrank' command\r\n";
+        case MSG_REQ_REDIS_ZUNION:
+            return (uint8_t *) "'zunion' command\r\n";
+        case MSG_REQ_REDIS_ZSCAN:
+            return (uint8_t *) "'zscan' command\r\n";
+        case MSG_REQ_REDIS_ZSCORE:
+            return (uint8_t *) "'zscore' command\r\n";
+        case MSG_REQ_REDIS_ZUNIONSTORE:
+            return (uint8_t *) "'zunionstore' command\r\n";
+        case MSG_REQ_REDIS_GEOADD:
+            return (uint8_t *) "'geoadd' command\r\n";
+        case MSG_REQ_REDIS_GEODIST:
+            return (uint8_t *) "'geodist' command\r\n";
+        case MSG_REQ_REDIS_GEOHASH:
+            return (uint8_t *) "'geohash' command\r\n";
+        case MSG_REQ_REDIS_GEORADIUS:
+            return (uint8_t *) "'georadius' command\r\n";
+        case MSG_REQ_REDIS_GEORADIUSBYMEMBER:
+            return (uint8_t *) "'georadiusbymember' command\r\n";
+        case MSG_REQ_REDIS_GEOPOS:
+            return (uint8_t *) "'geopos' command\r\n";
+        case MSG_REQ_REDIS_GEOSEARCH:
+            return (uint8_t *) "'geosearch' command\r\n";
+        case MSG_REQ_REDIS_GEOSEARCHSTORE:
+            return (uint8_t *) "'geosearchstore' command\r\n";
+        case MSG_REQ_REDIS_EVAL:
+            return (uint8_t *) "'eval' command\r\n";
+        case MSG_REQ_REDIS_EVALSHA:
+            return (uint8_t *) "'evalsha' command\r\n";
+        case MSG_REQ_REDIS_PING:
+            return (uint8_t *) "'ping' command\r\n";
+        case MSG_REQ_REDIS_QUIT:
+            return (uint8_t *) "'quit' command\r\n";
+        case MSG_REQ_REDIS_AUTH:
+            return (uint8_t *) "'auth' command\r\n";
+        case MSG_REQ_REDIS_SELECT:
+            return (uint8_t *) "'select' command\r\n";
+        case MSG_REQ_REDIS_COMMAND:
+            return (uint8_t *) "'command' command\r\n";
+        case MSG_REQ_REDIS_LOLWUT:
+            return (uint8_t *) "'lolwut' command\r\n";
+    }
+    return (uint8_t *)"\r\n";
 }
